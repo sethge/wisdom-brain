@@ -1,0 +1,3 @@
+URL: https://e.waimai.meituan.com/new_fe/activity
+
+2秒后自动返回商家后台首页
