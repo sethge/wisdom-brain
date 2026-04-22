@@ -200,6 +200,135 @@
 
 ---
 
+### 6. 批量运营诊断端到端流程（E2E）
+
+**触发词：** "做运营诊断"、"跑诊断"、"这些店做一下"
+
+**前置条件：**
+- Chrome已打开且悟空插件已登录（CDP端口9222）
+- `~/Downloads/wisdom-brain/BRAIN.md` 和 `SKILL.md` 已就绪
+
+**E-1** 完整流程（5步）：
+
+```
+步骤1：数据采集（crawl_batch.py）
+步骤2：读JSON + 套BRAIN/SKILL → 写诊断markdown
+步骤3：markdown → PDF → 桌面
+步骤4：播完成音
+步骤5：汇报结果
+```
+
+---
+
+**E-2** 步骤1：数据采集
+
+脚本：`~/Downloads/wisdom-brain/crawl_batch.py`
+输出：`~/Downloads/wisdom-brain/diagnosis-test/crawl_raw_{店名}_{日期}.json`
+
+```bash
+# 如果用户给了新的店铺列表，先更新crawl_batch.py里的stores数组
+# 然后运行：
+cd ~/Downloads/wisdom-brain && /opt/homebrew/bin/python3 crawl_batch.py
+# 从第N家开始（断点续跑）：
+/opt/homebrew/bin/python3 crawl_batch.py N
+```
+
+- 每家店：悟空登录→点经营分析→经营数据→遍历所有tab（总览/行业/营收/流量/推广/营销/顾客/服务/商品）
+- 流量tab额外切：全部顾客/新客/老客 × 商圈均值/前10%
+- 行业/服务tab加载慢，已加额外等待+重试（内容<80字符自动重试）
+- 采完关闭页面再登下一家
+
+**E-3** 步骤2：诊断分析
+
+对每个 `crawl_raw_*.json`，读取数据后按以下结构写诊断markdown：
+
+```markdown
+# {店名}运营诊断
+> 诊断时间 / 数据来源 / 数据周期 / 认知版本
+
+## 一、卖对的东西了吗？
+### 1.1 这家店到底在卖什么（TOP20销量表 → 产品线归纳）
+### 1.2 顾客行为还原（消费场景还原、加购/搭配信号）
+### 1.3 深层产品分析（定价逻辑、品类宽度、集中度）
+
+## 二、把东西卖对了吗？
+### 2.1 基础指标（评分/排名/复购/食安）
+### 2.2 拆新老客（L-1：新老客漏斗分别列出，对比均值和前10%）
+### 2.3 新客链路（曝光→进店率→下单率，标均值对比）
+### 2.4 老客链路（同上+复购率+频次分布）
+### 2.5 顾客是谁，去了哪（竞对流向TOP10）
+### 2.6 客单价与利润（到手率=营收/优惠前总额，D-9）
+### 2.7 活动与满减（每档策略解读+成本分布+推广数据）
+### 2.8 神抢手/拼好饭（如有）
+
+## 三、诊断总结
+### 核心判断（一句话定性）
+### 核心问题排序（按严重程度，每条有数据支撑）
+### 做对了的
+
+## 四、TODO
+| # | TODO | 漏斗环节 | 原因逻辑 | 预估影响 | 类型 |
+Tips单独列（不计入采纳率）
+
+## 五、还需确认
+| 项目 | 状态 | 说明 |
+```
+
+**分析时必须应用的BRAIN规则：**
+- L-1：第一件事拆新老客，综合指标是假象
+- L-3 / L-3-1：满减=升级引导不是进店吸引，第一档=实付×1.15÷0.9
+- D-5：同时看均值和前10%两个基准
+- D-8：低客单高量品类（面/粉/饼）不要用客单价衡量好坏
+- D-9：到手率=营收/优惠前总额，低于50%必须重点标注
+- P-1：产品线结构分析，识别"主品+搭配品"消费场景
+- R-1/R-2：差评逐条读，商家回复质量分析
+- J-1：不了解的不下判断
+- T-1：每个TODO必须有4项（改什么/漏斗环节/原因逻辑/预估影响）
+
+**并行策略：** 多家店可以并行分析（用Agent工具），每家独立一个agent，给它crawl_raw JSON路径+BRAIN.md+SKILL.md+参考范例路径。
+
+---
+
+**E-4** 步骤3：PDF转换
+
+脚本：`/tmp/md2pdf3.py`（markdown→HTML→Chrome headless→PDF）
+依赖：`pip install markdown`、Google Chrome
+
+```python
+# 核心逻辑：
+# 1. markdown库转HTML（extensions: tables, fenced_code, nl2br）
+# 2. 包装成带中文字体CSS的完整HTML（PingFang SC / Heiti SC）
+# 3. Chrome --headless --print-to-pdf 渲染
+# 4. 输出到 ~/Desktop/{店名}_运营诊断_{日期}.pdf
+```
+
+```bash
+/opt/homebrew/bin/python3 /tmp/md2pdf3.py
+```
+
+- 源目录：`~/Downloads/wisdom-brain/diagnosis-test/*_运营诊断_*.md`
+- 输出目录：`~/Desktop/`
+- 如果 `/tmp/md2pdf3.py` 不存在，按上述逻辑重新创建
+
+---
+
+**E-5** 步骤4-5：完成
+
+```bash
+afplay /System/Library/Sounds/Funk.aiff
+```
+
+汇报：X家诊断完成，PDF已放桌面。列出每家店一句话核心发现。
+
+---
+
+**E-6** 参考范例
+
+- 诊断markdown格式参考：`~/Downloads/wisdom-brain/diagnosis-test/峨眉郑记豆腐脑_宽窄店_运营诊断_20260422.md`
+- 这是当前最完整的范例，新诊断对标这个格式和深度
+
+---
+
 ## 三、模糊执行请求逻辑
 
 ### 触发规则
