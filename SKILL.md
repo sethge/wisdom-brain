@@ -343,3 +343,4 @@ afplay /System/Library/Sounds/Funk.aiff
 ### 触发时机
 - 遇到新客立减/推广/满减设计/套餐设计相关操作时
 - Seth分享运营操作截图或流程时
+
